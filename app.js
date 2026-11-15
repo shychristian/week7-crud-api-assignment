@@ -61,6 +61,9 @@ app.patch('/todos/:id', validatePatch, (req, res, next) => {
 app.delete('/todos/:id', (req, res, next) => {
  try {
    const id = parseInt(req.params.id);
+  if (isNaN(id)){
+    throw new Error('Invalid ID');
+  }
   const initialLength = todos.length;
   todos = todos.filter((t) => t.id !== id); // Array.filter() – non-destructive
   if (todos.length === initialLength)
