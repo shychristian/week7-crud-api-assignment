@@ -7,6 +7,9 @@ const logRequest = require('./middlewares/logger.js');
 const validateTodo = require('./middlewares/validator.js');
 const errorHandler = require('./middlewares/errorHandler.js');
 const validatePatch = require('./middlewares/validatePatch.js');
+const Todo = require('./models/todo.models.js');
+const connectDB = require('./database/db.js');
+
 app.use(express.json()); // Parse JSON bodies
 
 const corsOptions = {
@@ -14,43 +17,35 @@ const corsOptions = {
   optionsSuccessStatus: 200, // some legacy browsers (IE11, various SmartTVs) choke on 204
 };
 
+connectDB();
+
 app.use(cors(corsOptions));
 
 app.use(logRequest); // Use the logger middleware for all routes
 
-let todos = [
-  { id: 1, task: 'Learn Node.js', completed: false },
-  { id: 2, task: 'Build CRUD API', completed: false },
-  { id: 3, task: 'Test API', completed: true },
-  { id: 4, task: 'Deploy API', completed: true },
-];
-
 // GET All – Read
-app.get('/todos', (req, res) => {
+app.get('/todos', async (req, res) => {
+
+const todos = await Todo.find({}); // Fetch all todos from the database
   res.status(200).json(todos); // Send array as JSON
 });
 
 // POST New – Create with Validation - week 3 assignment
-app.post('/todos', validateTodo, (req, res, next) => {
+app.post('/todos', validateTodo, async (req, res, next) => {
   try {
-    const { task } = req.body;
-  if (!task) {
-    return res.status(400).json({ error: 'Task is required' });
-  }
-  const newTodo = { id: todos.length + 1, task, completed: false };
-  todos.push(newTodo);
-  res.status(201).json(newTodo);
+    const newTodo = new Todo(req.body);
+    await newTodo.save();
+    res.status(201).json(newTodo);
   } catch (error) {
     next(error);
   }
 });
 
 // PATCH Update – Partial
-app.patch('/todos/:id', validatePatch, (req, res, next) => {
+app.patch('/todos/:id', validatePatch, async (req, res, next) => {
  try {
-   const todo = todos.find((t) => t.id === parseInt(req.params.id)); // Array.find()
+   const todo = await Todo.findByIdAndUpdate(req.params.id, req.body, { new: true }); // Use Mongoose's findByIdAndUpdate method to fetch and update the todo by ID
   if (!todo) return res.status(404).json({ message: 'Todo not found' });
-  Object.assign(todo, req.body); // Merge: e.g., {completed: true}
   res.status(200).json(todo);
  } catch (error) {
   next(error);
@@ -58,25 +53,23 @@ app.patch('/todos/:id', validatePatch, (req, res, next) => {
 });
 
 // DELETE Remove
-app.delete('/todos/:id', (req, res, next) => {
+app.delete('/todos/:id',  async (req, res, next) => {
  try {
-   const id = parseInt(req.params.id);
-  if (isNaN(id)){
-    throw new Error('Invalid ID');
+  const id = parseInt(req.params.id);
+  const todo = await Todo.findByIdAndDelete(req.params.id); // Use Mongoose's findByIdAndDelete method to fetch and delete the todo by ID
+
+  if (!todo) { 
+    return res.status(404).json({ message: 'Todo not found' });
   }
-  const initialLength = todos.length;
-  todos = todos.filter((t) => t.id !== id); // Array.filter() – non-destructive
-  if (todos.length === initialLength)
-    return res.status(404).json({ error: 'Not found' });
-  res.status(204).send(); // Silent success
+  res.status(200).json({ message: `Todo ${req.params.id} deleted successfully` });
  } catch (error) {
   next(error);
  }
 });
 
-app.get('/todos/completed', (req, res, next) => {
+app.get('/todos/completed', async (req, res, next) => {
  try {
-   const completed = todos.filter((t) => t.completed);
+   const completed = await Todo.find({ completed: true });
   res.status(200).json(completed); // Custom Read!
  } catch (error) {
   next(error);
@@ -84,9 +77,9 @@ app.get('/todos/completed', (req, res, next) => {
 });
 
 // Get /todos/active (filter !completed) – Read- Week 3 assignment
-app.get('/todos/active', (req, res, next) => {
+app.get('/todos/active', async (req, res, next) => {
   try {
-      const activeTodos = todos.filter(t => !t.completed);
+      const activeTodos = await Todo.find({ completed: false });
     res.status(200).json(activeTodos); // Send the list of active todos as JSON response
   } catch (error) {
     next(error);
@@ -94,14 +87,10 @@ app.get('/todos/active', (req, res, next) => {
 });
 
 // Get by ID – Read- Week 3 assignment
-app.get('/todos/:id', (req, res, next) => {
+app.get('/todos/:id', async (req, res, next) => {
  try {
-  const id = parseInt(req.params.id);
-  if (isNaN(id)){
-    throw new Error('Invalid ID');
-  }
-
-  const todo = todos.find((t) => t.id === id);
+ 
+  const todo = await Todo.findById(req.params.id); // Use Mongoose's findById method to fetch the todo by ID
   if (!todo) return res.status(404).json({ message: 'Todo not found' });
   res.status(200).json(todo);
  } catch (error) {
