@@ -77,7 +77,7 @@ app.get('/todos/completed', async (req, res, next) => {
 });
 
 // Get /todos/active (filter !completed) – Read- Week 3 assignment
-app.get('/todos/active', async (req, res, next) => {
+app.get('/todos?completed=false', async (req, res, next) => {
   try {
       const activeTodos = await Todo.find({ completed: false });
     res.status(200).json(activeTodos); // Send the list of active todos as JSON response
